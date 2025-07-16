@@ -4,7 +4,7 @@ Utilized Google Keep APIs to extract notes utilizing authorization
 One html file to keep track of the front-end interface
 will keep track of Google Drive and Google Keep credentials
 
-
+*credentials.json and pkl are not avaliable to safeguard personal information
 Notes from Google keep are not saved to drive for the purpose of utilizing them in python
 OOP aspect
 
