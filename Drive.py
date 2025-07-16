@@ -2,12 +2,14 @@ from googleapiclient.discovery import build
 from googleapiclient.http import MediaFileUpload
 from google_auth_oauthlib.flow import InstalledAppFlow
 from google.auth.transport.requests import Request
+from google.oauth2 import service_account
 import json
 import os
 import pickle
 
 SCOPES = ['https://www.googleapis.com/auth/drive.file']
-CREDENTIALS_FILE = 'credentials.json'
+CREDENTIALS_FILE = os.getenv('GOOGLE_APPLICATION_CREDENTIALS', 'credentials.json')
+
 TOKEN_FILE = 'token.pickle'
 FOLDER_ID = '18gCIAXSBe3uOjz2KgUTc2K7iZ9Pfoz1e'  # Use just the folder ID, not the URL
 
