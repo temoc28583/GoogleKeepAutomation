@@ -32,10 +32,6 @@ class AuthHandle:
     def get_keep_auth(self):
         if self.keep_auth:
                return self.keep_auth
-            
-     
-
-    
     
 def login_drive(self):
     cred=None #stores credentials with token, refresh token
@@ -61,6 +57,6 @@ def get_keep_auth(self):
 def get_drive_auth(self):
     return self.drive_auth
         
-        
+    
         
     
