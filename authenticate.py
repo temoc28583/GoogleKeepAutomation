@@ -1,62 +1,67 @@
-import gkeepapi
 import os
-import pickle  # For storing token
+import pickle
+import gkeepapi
 from googleapiclient.discovery import build
-from googleapiclient.http import MediaFileUpload
 from google_auth_oauthlib.flow import InstalledAppFlow
 from google.auth.transport.requests import Request
-import google.oauth2.credentials
+
+
 class AuthHandle:
     def __init__(self):
-        self.keep_auth = None  # stores gkeepapi.Keep() object
-        self.drive_auth = None  # optionally for future Drive support
-        self.credential_path= "credentials.json" #python script use this for the flow and starting a login session when a oAuth client ID is made
-        self.drive_token= "token.pickle"#allows the session to resume
-        self.scope='https://www.googleapis.com/auth/drive.file' #defines the permission within drive the request can go through to
+        self.keep_auth = None  # gkeepapi.Keep() instance after auth
+        self.drive_auth = None  # Google Drive API client after auth
 
-    def login_gkeep(self, user, gPassword):
+        self.credentials_path = "credentials.json"  # OAuth2 client secrets file
+        self.token_drive_path = "token_drive.pickle"  # Store Drive token here
+        self.drive_scopes = ['https://www.googleapis.com/auth/drive.file']
+
+    def login_gkeep(self, user_name, pass_word):
+        keep = gkeepapi.Keep()
+
+        # Attempt to log in
         try:
-            keep = gkeepapi.Keep()
-            keep.authenticate(user, gPassword)
-            self.keep_auth = keep
-            return True  # optional success return
-        except gkeepapi.exception.LoginException as e:
-            print(f"Authentication with Google Keep failed: {e}")
-            self.keep_auth = None
-            return False
+            success = keep.authenticate(user_name, pass_word)
+            if success:
+                self.keep_auth = keep
+                print("Google Keep login successful")
+                return True
+            else:
+                print("Google Keep login unsuccessful")
+                return False
         except Exception as e:
-            print("Unexpected error during authentication:", e)
-            self.keep_auth = None
+            print(f"Something went wrong during Keep login: {e}")
             return False
+
+    def login_drive(self):
+        creds = None
+
+        # Load token for Drive if it exists
+        if os.path.exists(self.token_drive_path):
+            with open(self.token_drive_path, 'rb') as token_file:
+                creds = pickle.load(token_file)
+
+        # If no valid token, perform OAuth2 flow
+        if not creds or not creds.valid:
+            if creds and creds.expired and creds.refresh_token:
+                creds.refresh(Request())
+            else:
+                flow = InstalledAppFlow.from_client_secrets_file(
+                    self.credentials_path,
+                    self.drive_scopes
+                )
+                creds = flow.run_local_server(port=0)
+
+            # Save the credentials for next time
+            with open(self.token_drive_path, 'wb') as token_file:
+                pickle.dump(creds, token_file)
+
+        # Build Drive API client
+        self.drive_auth = build('drive', 'v3', credentials=creds)
+        print("Google Drive login successful")
+        return self.drive_auth
 
     def get_keep_auth(self):
-        if self.keep_auth:
-               return self.keep_auth
-    
-def login_drive(self):
-    cred=None #stores credentials with token, refresh token
-    if os.path.exists(self.drive_token):
-        with open(self.drive_token, 'rb') as file: #checks if credentials exist from previous session
-            cred=pickle.load(file) #loads the object in memory
-    if not cred or not cred.valid:
-        if cred and cred.expired and cred.refesh_token:
-            cred.refresh(Request()) #use request to get updated token if the credentials expired but exist
-    else:
-        flow=InstalledAppFlow.from_client_secrets_file(
-         self.credential_path, self.scope) #generate flow object to run a session if the credentials are not authorized uses scope  to define permission and the credentials file from the json file
-        cred=flow.run_local_server(port=0) #Open browser for the user to log in
-    #save credentials from the token but this time to resume it
-    with open(self.drive_token, 'wb') as f:
-        pickle.dump(cred,f) #save credentials to token once the user has a  sucessful login
-    self.drive_auth=build("drive","v1", credentials=cred) #creates Google drive api via the client api
-    return self.drive_auth #returns client
-    
-def get_keep_auth(self):
-    return self.keep_auth
+        return self.keep_auth
 
-def get_drive_auth(self):
-    return self.drive_auth
-        
-    
-        
-    
+    def get_drive_auth(self):
+        return self.drive_auth
