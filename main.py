@@ -6,15 +6,24 @@ from Convert import Convert
 from Drive import Drive
 import getpass
 import os
+import sys
+from dotenv import load_dotenv
+
+load_dotenv(dotenv_path="claude.env")
+
+claude_key = os.getenv("CLAUDE_API_KEY") #use os.getenv to establish from claude.env rather than hardcoding
+if not claude_key:
+    print("Claude key not set")
+    sys.exit(1)
 
 # Step 1: Authenticate to Google Keep
 TestAuth = AuthHandle()
 test_user = str(input("Enter your Google email: "))
-test_pass = getpass("Enter your app password: ")#ensures that password is not shown on screen
+test_pass = str(input("Enter your app password: "))#ensures that password is not shown on screen
 
 if not TestAuth.login_gkeep(test_user, test_pass):
     print("Authentication failed, exiting.")
-    exit()
+    sys.exit()
 
 keep_notes = TestAuth.get_keep_auth()
 
@@ -23,12 +32,8 @@ notes_fetcher = Notefetch(keep_auth=keep_notes)
 fetched_notes = notes_fetcher.get_notes()
 
 # Step 3: Tag notes using Claude and 16 digit App password
-claude_key = os.getenv("CLAUDE_API_KEY")
-if not claude_key:
-    print("Claude key not set")
-    exit(1)
 
-tagger = Tag(api_key=claude_key,email=test_user,password=test_pass)
+tagger = Tag(api_key=claude_key,keep_obj=keep_notes)
 
 
 results = tagger.consolidate_tags(fetched_notes)
@@ -51,5 +56,15 @@ print(markedOutput)
 # Step 6: Upload tagged notes in JSON to Google Drive Folder
 drive = Drive(results)
 drive.to_json()
-drive.login_drive()
+drive.service=TestAuth.get_drive_auth()
+if drive.service is None:
+      print("Drive service not authenticated yet, authenticating...")
+      TestAuth.login_drive()
+      drive.service=TestAuth.get_drive_auth()
+      if drive.service is None:
+        print("Drive authentication failed, cannot upload.")
+        exit(1)
+          
+        
+  
 drive.upload_drive()
