@@ -1,24 +1,30 @@
-from flask import Flask, request,render_template #Use this to return a rendered html file via flask
-#request from flask is an object that contains data from either get or post methods
+from flask import Flask, request, render_template
 from authenticate import AuthHandle
-app= Flask(__name__)
+
+app = Flask(__name__)
+
 @app.route('/')
 def index():
-    return render_template('interface.html') #returns the content of what is in interface
+    return render_template('login.html')  # A simple HTML form
 
-
-
-@app.route('/login', methods= "POST")
-
+@app.route('/login', methods=["POST"])
 def login():
-    email=request.form['email']
-    password=request.form['password'] #way to access form information in the form of a dictionary when the user enters their username and password via a post request
-    
-    Auth= AuthHandle()
-    Auth.login_gkeep(email,password)
-    return "Connected to Google Keep"
+    notion_token = request.form.get('Notion_Token')
+    database_id = request.form.get('Database_ID')
+
+    auth = AuthHandle()
+    client = auth.login_notion(notion_token, database_id)
+
+    if client is None:
+        return "Login failed: Missing Notion token or Database ID", 400
+
+    return "Login successful!"
 
 
-if __name__ == '__main__ ':
-    app.run(debug=True) #call dev server to make sure the script
-    
+
+
+
+
+
+
+
