@@ -1,0 +1,35 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8">
+  <title>Login error</title>
+  <style>
+    body {
+      font-family: Arial, sans-serif;
+      padding: 40px;
+      background-color: #fbeaea;
+      color: #a94442;
+    }
+    .error-container {
+      background-color: #f2dede;
+      padding: 20px;
+      border: 1px solid #ebccd1;
+      border-radius: 8px;
+      max-width: 500px;
+      margin: 0 auto;
+      text-align: center;
+    }
+    a {
+      color: #a94442;
+      text-decoration: underline;
+    }
+  </style>
+</head>
+<body>
+  <div class="error-container">
+    <h1>Unable to login</h1>
+    <p>{{ error }}</p>
+    <p><a href="/">Try Again</a></p>
+  </div>
+</body>
+</html>
