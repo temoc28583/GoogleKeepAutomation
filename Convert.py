@@ -1,44 +1,33 @@
-import gkeepapi
-
 class Convert:
-    def __init__(self, fullNotes):
-        self.notes = fullNotes  # Store the list of notes to be converted
+    def __init__(self, notes):
+        """
+        :param notes: Dictionary with notes in format:
+         {
+            "NoteTitle1": {"tags": ['seo'], "Content": "..."},
+            "NoteTitle2": {"tags": ['tech'], "Content": "..."}
+         }
+        """
+        self.notes = notes
 
     def markNotes(self):
-        markdown_text = ""  # Initialize an empty string to store the final markdown content
+        """
+        Convert notes dictionary into markdown strings.
+        Returns dict with note title as key and markdown string as value.
+        """
+        marked_dict = {}
 
-        for note in self.notes:
-            tags = note.get("Tags", [])  # Get the list of tags from the note, or empty list if not present
-
-            # Find the key in the note dictionary that holds the note content (not 'Tags')
-            contentKey = None
-            for key in note:
-                if key != "Tags":
-                    contentKey = key
-                    break  # Stop at the first non-Tag key
-
-            # Get the actual note content using the identified key
-            content = note.get(contentKey) if contentKey else ""
-
-            # If there are any tags, format them and add to markdown output
-            if tags:
-                tags_mark = "#Tags# " + ": ".join(tags)  # Join tags with ": ", add a label
-                markdown_text += f"{tags_mark}\n---\n"   # Separate tags from content using horizontal line
-
-            # Add the note content followed by two newlines
-            markdown_text += f"{content}\n\n"
-
-        return markdown_text
+        for title, info in self.notes.items(): #info is a dictionary with tags(list) and the content itself {"tags": ["seo"], "Content": "..."}
 
 
-       
-            
-            
-                
-            
-            
+            tags = info.get("tags", []) #reiteves tag list from info dictionary, if no tags, returns empty list
+            content = info.get("Content", "") #returns content from info dictionary, if no content, returns empty string
+            markdown_text = f"## {title}\n"
+            markdown_text += f"**Tags:** {', '.join(tags)}\n\n"
+            markdown_text += f"{content}\n\n---\n\n"
+            marked_dict[title] = markdown_text
+
+        return marked_dict
 
 
 
-        
-    
+
