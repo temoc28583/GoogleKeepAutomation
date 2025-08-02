@@ -1,41 +1,89 @@
-# GoogleKeepAutomation
-Utilized Google Keep APIs to extract notes utilizing authorization
+Overview
+GoogleKeepAutomation is a Python-based project designed to streamline note management by connecting Google Keep, Notion, and Google Drive.
+The system allows users to:
 
-One html file to keep track of the front-end interface
-will keep track of Google Drive and Google Keep credentials
+Fetch notes from a Notion database
 
-*credentials.json and pkl are not avaliable to safeguard personal information
-Notes from Google keep are not saved to drive for the purpose of utilizing them in python
-OOP aspect
+Automatically categorize and tag them using AI
 
-Plan to utilize 5 classes total
-authenticate.py
-handles user credentials to google keep and drive by using authenicate and store the session in an object to avoid relogging in
-*goal is to reuse the same keep session object across classes to ensure that authentication and uploading notes to drive do not require different sessions
-Notefetch.py
-retrieve notes to process for tagging (this includes taking the notes from keep)
-use all() from the authenication object established in authenticate.py
-keep_notes = TestAuth.get_keep_auth() this is the authentication object which will be used to get the notes from google keep
-notes = Notefetch()
-notes.keep_auth = keep_notes
-fetched_notes = notes.get_notes()
-Tag.py
-tags the notes on an AI platform(use an API) for predefined sets
-use the cateogories list with with the predefined tags
-Use antrophic api to connect the prompts in the est_prompt and claude_process function to give approriate tags based on the content of the notes
-use split() to format the notes
-Note.py
+Convert the notes into markdown format
+
+Upload the processed notes to Google Drive
+
+The project leverages Object-Oriented Programming (OOP) principles to maintain clean modularity, enabling reusable authentication sessions and a scalable workflow.
+
+The project consists of:
+
+5 core Python classes (in separate modules) for handling authentication, note fetching, tagging, markdown conversion, and Google Drive uploads
+
+A  Flask backend for processing authentication requests from a simple HTML interface
+
+Key Components
+1. Authentication (authenticate.py)
+Authenticates with Notion using an Integration Token and Database ID.
+
+Authenticates with Google Drive using OAuth credentials (credentials.json).
+
+Stores and reuses authentication sessions (service objects) to prevent repeated logins.
+
+This is critical for Drive.py, which relies on the Drive service object to upload files efficiently.
+2. Notefetching(Notefetch.py)
+Key Components
+Retrieves both the note properties and block content:
+
+Headers
+
+Bullet points
+
+Rich text content
+
+Returns notes in a structured dictionary format for further processing.
+
+3.Tagging(Tag.py)
+Categorizes notes into predefined tags using Anthropic Claude API.
+
+Workflow:
+
+Prepare prompts using est_prompt
+
+Process notes via claude_process
+
+Attach tags to each note
+
+Final format:{
+"title":
+    {
+      "content":,
+      "tags": [tag1,tag2]  
+    }
+}
+Utilizes string operations like split() for parsing and formatting note content.
+
+4.Converts the tagged notes dictionary into Markdown format.
 Markdown.py
-Convert the notes and tags into markdown format by using the markdown library
+Ensures exported files are neatly formatted with headings while preserving the dictionary format
 
-Drive.py
-utiilize Google Drive API and and MediaFileUpload library to obtain information about the folder in google drive along with the converted tagged  notes to send the notes to google drive
+5. Drive.py
+Handles uploading of markdown files to a specified Google Drive folder.
+Retrieves folder information and uploads files to the authenticated account using the reusable Drive service object.
 
+Frontend- interface.html
+ interface for user authentication.
+Backend- app.py
+Uses a POST form to send credentials:
 
+A Flask application that:
 
-interface.html
-stores the backend form request to make sure the user is authenticated use form method= "POST"
-Name will serve as data send to the backend request.form['email'] 
-app.py
-Flask file that will process the HTML Post Request
+Processes POST requests from interface.html
 
+Triggers authentication and note processing workflows
+
+Returns success/failure responses for uploads
+Security featured
+credentials.json and .pkl files are excluded from version control to protect sensitive tokens and session data.
+
+OAuth tokens are securely stored for session reuse.
+Object Orientated Program and reusablity
+Each functionality (Auth, Fetching, Tagging, Markdown Conversion, Drive Upload) is encapsulated in a dedicated class.
+
+Authentication objects are shared across classes to prevent redundant logins.
