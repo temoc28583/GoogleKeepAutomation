@@ -1,82 +1,59 @@
 from googleapiclient.discovery import build
 from googleapiclient.http import MediaFileUpload
-from google_auth_oauthlib.flow import InstalledAppFlow
-from google.auth.transport.requests import Request
-from google.oauth2 import service_account
-import json
 import os
-import pickle
 
 SCOPES = ['https://www.googleapis.com/auth/drive.file']
 CREDENTIALS_FILE = os.getenv('GOOGLE_APPLICATION_CREDENTIALS', 'credentials.json')
+FOLDER_ID = os.getenv("FOLDER_ID", '18gCIAXSBe3uOjz2KgUTc2K7iZ9Pfoz1e')
 
-TOKEN_FILE = 'token.pickle'
-FOLDER_ID = '18gCIAXSBe3uOjz2KgUTc2K7iZ9Pfoz1e'  # Use just the folder ID, not the URL
 
 class Drive:
-    def __init__(self, tagged_notes):
+    def __init__(self, tagged_notes, service, file_name, folder_id=None):
         self.tagged = tagged_notes
-        self.json_file = "tagged_notes.json"
-        self.service = None
+        self.service = service
+        self.mark_file = "tagged_notes.md"
+        self.file_name = file_name
+        self.folder_id = folder_id or FOLDER_ID
 
-    def to_json(self):
-        """Write tagged notes to a local JSON file."""
-        with open(self.json_file, 'w', encoding='utf-8') as f:
-            json.dump(self.tagged, f, indent=4)
-        print(f"Tagged notes saved to {self.json_file}")
+    def to_markdown(self):
+        full_markdown = "\n".join(self.tagged.values())
+        with open(self.mark_file, 'w', encoding='utf-8') as f:
+            f.write(full_markdown) #combined all the notes into one markdown string and writes to a file
+        print(f"Markdown notes saved to {self.mark_file}")
 
-    def login_drive(self):
-        """Authenticate and initialize Google Drive service."""
-        creds = None
-
-        if os.path.exists(TOKEN_FILE):
-            with open(TOKEN_FILE, 'rb') as file:
-                creds = pickle.load(file)
-
-        if not creds or not creds.valid:
-            if creds and creds.expired and creds.refresh_token:
-                creds.refresh(Request())
-            else:
-                flow = InstalledAppFlow.from_client_secrets_file(CREDENTIALS_FILE, SCOPES)
-                creds = flow.run_local_server(port=0)
-
-            # Save the new token
-            with open(TOKEN_FILE, 'wb') as f:
-                pickle.dump(creds, f)
-
-        # Build the Drive service
-        self.service = build("drive", "v3", credentials=creds)
-
-    def upload_drive(self):
-        """Upload the JSON file to Google Drive."""
-        if not self.service:
+    def upload_file(self, file_path, file_name, mime_type='text/markdown'):
+        if not self.service: #this is the drive service object that will recongize the reques to upload a file
             print("Drive service not established.")
             return None
 
+        if not os.path.exists(file_path):
+            print(f"File {file_path} does not exist.")
+            return None
+
         file_metadata = {
-            'name': 'TaggedNotes.json',
-            'parents': [FOLDER_ID],
-            'mimeType': 'application/json'
-        }
+            'name': file_name,
+            'parents': [self.folder_id],
+            'mimeType': mime_type
+        } #meta data for the file consiting of the name, ID of the folder where it will be uploaded and the type of file
 
-        media = MediaFileUpload(self.json_file, mimetype='application/json')
+        media = MediaFileUpload(file_path, mimetype=mime_type) #stores file in object to allow for streaming
 
-        uploaded_file = self.service.files().create(
-            body=file_metadata,
-            media_body=media,
-            fields='id'
-        ).execute()
+        try:
+            uploaded_file = self.service.files().create(
+                body=file_metadata,
+                media_body=media,
+                fields='id'
+            ).execute() #performs the upload task by calling files().create method by passing information and content and fields
+            print(f"Uploaded {file_name} to Drive. File ID: {uploaded_file.get('id')}")
+            return uploaded_file.get('id')
+        except Exception as e:
+            print(f"Failed to upload {file_name}: {e}")
+            return None
 
-        print(f"File uploaded to Drive. File ID: {uploaded_file.get('id')}")
-
-
-
-
-        
-    
-    
-
-
-
-
-
+    def save_and_upload(self):
+        self.to_markdown() #saves notes to markdown which is later uploaded to drive
+        return self.upload_file(
+            file_path=self.mark_file,
+            file_name=self.file_name,
+            mime_type='text/markdown'
+        )
