@@ -16,17 +16,19 @@ class Convert:
         """
         marked_dict = {}
 
-        for title, info in self.notes.items(): #info is a dictionary with tags(list) and the content itself {"tags": ["seo"], "Content": "..."}
-
-
-            tags = info.get("tags", []) #reiteves tag list from info dictionary, if no tags, returns empty list
-            content = info.get("Content", "") #returns content from info dictionary, if no content, returns empty string
-            markdown_text = f"## {title}\n"
+        for title, info in self.notes.items(): #title is the ky and info is the value which is a dictionary with tags and content
+            tags = info.get("tags", [])
+            if not tags:
+                tags = ['untagged'] #this tells us that there were no tages for the note
+            content = info.get("Content", "")
+            markdown_text = "---\n"
+            markdown_text += f"## {title}\n"
             markdown_text += f"**Tags:** {', '.join(tags)}\n\n"
             markdown_text += f"{content}\n\n---\n\n"
-            marked_dict[title] = markdown_text
+            marked_dict[title] = markdown_text #dictionary with title as key and markdown string as value
 
         return marked_dict
+
 
 
 
