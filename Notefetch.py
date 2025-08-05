@@ -6,74 +6,114 @@ class Notefetch:
         self.database_id = database_id
 
     def get_all_notes(self):
-        try:
-            response = self.notion_client.databases.query(
-                database_id=self.database_id,
-                filter={
-                    "property": "Platform",
-                    "select": {
-                        "equals": "Google Keep"
-                    }
-                }
-            ) #creates a response object that queries the database to find the notes from Google Keep by calling the notion API
+        all_notes = {}
+        start_cursor = None
 
-            all_notes = {}
-            for page in response["results"]:#represents each page in the Notion Database, a page is a container for content with headers, paraggraph(a record of each note)
-                page_id = page["id"] #retrieves page id within the page or a container for content with headers,pargraphs as blocks(unique identifier for the page)
-                title_property = page["properties"]["Name"]["title"] #retrieves the Name property from the page(title is a property from database and is contained Name) from metdata column properties
-                if not title_property:
-                    continue
-#examples of blocks are headings, paragraphs, bulleted lists,etc within a page. Children blocks are blocks that contain other blocks within blocks(nested blocks)
-                title = title_property[0]["text"]["content"] #takes the first segment[0] of the title property
-                content = self._fetch_blocks_recursive(page_id) #used in case of nested blocks within the page and also to get the content
-                all_notes[title] = "\n".join(content) #stores the content of the notes in a dictionary with the title
+        try:
+            while True:
+                query_params = {"database_id": self.database_id, "page_size": 100}
+                if start_cursor:
+                    query_params["start_cursor"] = start_cursor
+
+                response = self.notion_client.databases.query(**query_params)
+
+                for page in response["results"]:
+                    page_id = page["id"]
+                    title_property = page["properties"]["Name"]["title"]
+                    if not title_property:
+                        continue
+
+                    title = title_property[0]["text"]["content"]
+                    content = self._fetch_blocks_recursive(page_id)
+                    all_notes[title] = {"id": page_id, "content": "\n".join(content)}
+
+                if response.get("has_more"):
+                    start_cursor = response["next_cursor"]
+                else:
+                    break
 
             return all_notes
-
         except Exception as e:
             print(f"Failed to fetch notes and content: {e}")
             return {}
 
-    def _fetch_blocks_recursive(self, block_id):
-        content = [] #used to collect cleaned text content from the blocks
+    def get_all_pages_in_database(self):
+        """Fetch all pages, including archived."""
+        all_pages = []
+        start_cursor = None
 
         try:
-            blocks = self.notion_client.blocks.children.list(block_id=block_id) #each block can be a paragraph, header, bullet but ultitemly takes the API to extract content within the block
+            while True:
+                query_params = {"database_id": self.database_id, "page_size": 100}
+                if start_cursor:
+                    query_params["start_cursor"] = start_cursor
 
-            for block in blocks["results"]: #loops through each block 
-                block_type = block["type"] #checks type of the block
-                rich_texts = [] #list of content objects within the block
+                response = self.notion_client.databases.query(**query_params)
+                all_pages.extend(response["results"])
 
-                if block_type == "paragraph":
-                    rich_texts = block["paragraph"]["rich_text"] #pulls out the content(rich text) from the paragraph block
-                elif block_type == "heading_1":
-                    rich_texts = block["heading_1"]["rich_text"] #pulls out the content(rich text) from the heading_1 block
-                elif block_type == "heading_2":
-                    rich_texts = block["heading_2"]["rich_text"]# pulls out the content(rich text) from the heading_2 block
-                elif block_type == "heading_3":# pulls out the content(rich text) from the heading_3 block
-                    rich_texts = block["heading_3"]["rich_text"]# pulls out the content(rich text) from the heading_3 block
-                elif block_type == "bulleted_list_item":
-                    rich_texts = block["bulleted_list_item"]["rich_text"]# pulls out the content(rich text) from the bulleted_list_item block
-                elif block_type == "numbered_list_item":
-                    rich_texts = block["numbered_list_item"]["rich_text"] # pulls out the content(rich text) from the numbered_list_item block
-                elif block_type == "quote":# pulls out the content(rich text) from the quote block
-                    rich_texts = block["quote"]["rich_text"]
+                if response.get("has_more"):
+                    start_cursor = response["next_cursor"]
+                else:
+                    break
+
+            return all_pages
+        except Exception as e:
+            print(f"Failed to fetch all pages: {e}")
+            return []
+
+    def _fetch_blocks_recursive(self, block_id):
+        content = []
+        try:
+            blocks = self.notion_client.blocks.children.list(block_id=block_id)
+            for block in blocks["results"]:
+                block_type = block["type"]
+
+                # Supported block types
+                mapping = {
+                    "paragraph": "paragraph",
+                    "heading_1": "heading_1",
+                    "heading_2": "heading_2",
+                    "heading_3": "heading_3",
+                    "bulleted_list_item": "bulleted_list_item",
+                    "numbered_list_item": "numbered_list_item",
+                    "quote": "quote",
+                    "to_do": "to_do",
+                    "callout": "callout"
+                }
+
+                if block_type in mapping:
+                    rich_texts = block[block_type]["rich_text"]
+                    for rt in rich_texts:
+                        content.append(self.clean_html(rt["text"]["content"]))
                 else:
                     print(f"Unsupported block type: {block_type}")
-                # Clean and append rich text content(which is rt in its formatted form of content within one block)
-                for rt in rich_texts: #loops through rich text segments(represented as a dict) within the block ecspecially if there are multiple(ex, Hello World! is a seperate rt object)
-                    content.append(self.clean_html(rt["text"]["content"])) #strips html tags and appends the cleaned text fo content
-                # We use rt["text"]["content"] to get the rich text that may be formatted uniquely to make it clean
+
                 if block.get("has_children"):
-                    child_content = self._fetch_blocks_recursive(block["id"]) #fetches child blocks content recurively if the notes are nested with multiple blocks within one block
-                    content.extend(child_content) #adds on the child content to the main content list
+                    child_content = self._fetch_blocks_recursive(block["id"])
+                    content.extend(child_content)
 
         except Exception as e:
             print(f"Error fetching blocks for block_id {block_id}: {e}")
 
         return content
 
-
     def clean_html(self, raw_html):
-        soup = BeautifulSoup(raw_html, "html.parser") #removes html attributes from the html content within the notes
-        return soup.get_text()
+        return BeautifulSoup(raw_html, "html.parser").get_text()
+
+    def del_notes(self, page_id):
+        try:
+            self.notion_client.pages.update(page_id=page_id, archived=True)
+            print(f"Archived note {page_id} successfully.")
+            return True
+        except Exception as e:
+            print(f"Error archiving note {page_id}: {e}")
+            return False
+
+    def unarchive_note(self, page_id):
+        try:
+            self.notion_client.pages.update(page_id=page_id, archived=False)
+            print(f"Unarchived note {page_id} successfully.")
+            return True
+        except Exception as e:
+            print(f"Error unarchiving note {page_id}: {e}")
+            return False
