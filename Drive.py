@@ -1,59 +1,61 @@
-from googleapiclient.discovery import build
 from googleapiclient.http import MediaFileUpload
 import os
-
-SCOPES = ['https://www.googleapis.com/auth/drive.file']
-CREDENTIALS_FILE = os.getenv('GOOGLE_APPLICATION_CREDENTIALS', 'credentials.json')
-FOLDER_ID = os.getenv("FOLDER_ID", '18gCIAXSBe3uOjz2KgUTc2K7iZ9Pfoz1e')
-
+import re
+import time
 
 class Drive:
-    def __init__(self, tagged_notes, service, file_name, folder_id=None):
-        self.tagged = tagged_notes
+    def __init__(self, tagged_notes, service, folder_id=None):
+        self.tagged = tagged_notes  # dict {title: markdown_text}
         self.service = service
-        self.mark_file = "tagged_notes.md"
-        self.file_name = file_name
-        self.folder_id = folder_id or FOLDER_ID
+        self.folder_id = folder_id or os.getenv("FOLDER_ID")
 
-    def to_markdown(self):
-        full_markdown = "\n".join(self.tagged.values())
-        with open(self.mark_file, 'w', encoding='utf-8') as f:
-            f.write(full_markdown) #combined all the notes into one markdown string and writes to a file
-        print(f"Markdown notes saved to {self.mark_file}")
+    def sep_file(self, file_name):
+        """Remove illegal characters from filename"""
+        return re.sub(r'[\\/*?:"<>|]', "_", file_name)
 
-    def upload_file(self, file_path, file_name, mime_type='text/markdown'):
-        if not self.service: #this is the drive service object that will recongize the reques to upload a file
+    def save_and_upload_individual_notes(self):
+        """Save each note as its own markdown and upload to Drive"""
+        uploaded_files = {}
+
+        if not self.service:
             print("Drive service not established.")
-            return None
+            return uploaded_files
 
-        if not os.path.exists(file_path):
-            print(f"File {file_path} does not exist.")
-            return None
+        for title, markdown_text in self.tagged.items():
+            safe_title = self.sep_file(title)
+            file_name = f"{safe_title}.md"
 
-        file_metadata = {
-            'name': file_name,
-            'parents': [self.folder_id],
-            'mimeType': mime_type
-        } #meta data for the file consiting of the name, ID of the folder where it will be uploaded and the type of file
+            # 1️⃣ Save markdown locally
+            with open(file_name, 'w', encoding='utf-8') as f:
+                f.write(markdown_text)
 
-        media = MediaFileUpload(file_path, mimetype=mime_type) #stores file in object to allow for streaming
+            # 2️⃣ Upload to Google Drive
+            file_metadata = {
+                'name': file_name,
+                'parents': [self.folder_id],
+                'mimeType': 'text/markdown'
+            }
+            media = MediaFileUpload(file_name, mimetype='text/markdown')
 
-        try:
-            uploaded_file = self.service.files().create(
-                body=file_metadata,
-                media_body=media,
-                fields='id'
-            ).execute() #performs the upload task by calling files().create method by passing information and content and fields
-            print(f"Uploaded {file_name} to Drive. File ID: {uploaded_file.get('id')}")
-            return uploaded_file.get('id')
-        except Exception as e:
-            print(f"Failed to upload {file_name}: {e}")
-            return None
+            try:
+                uploaded_file = self.service.files().create(
+                    body=file_metadata,
+                    media_body=media,
+                    fields='id'
+                ).execute()
+                file_id = uploaded_file.get('id')
+                uploaded_files[title] = file_id
+                print(f"✅ Uploaded {file_name} (File ID: {file_id})")
 
-    def save_and_upload(self):
-        self.to_markdown() #saves notes to markdown which is later uploaded to drive
-        return self.upload_file(
-            file_path=self.mark_file,
-            file_name=self.file_name,
-            mime_type='text/markdown'
-        )
+            except Exception as e:
+                print(f"❌ Failed to upload {file_name}: {e}")
+
+            # 3️⃣ Try to remove local file safely
+            time.sleep(0.1)  # Let Windows release file handle
+            try:
+                os.remove(file_name)
+            except PermissionError:
+                print(f"⚠ Could not delete {file_name} (still in use). Skipping.")
+
+        return uploaded_files
+
